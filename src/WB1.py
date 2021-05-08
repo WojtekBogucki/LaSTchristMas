@@ -9,6 +9,7 @@ from scipy.io import wavfile
 from scipy import signal
 import pandas as pd
 import gc
+import pickle
 from scipy.io import wavfile
 
 from keras import optimizers, losses, activations, models
@@ -17,7 +18,7 @@ from sklearn.model_selection import train_test_split
 import keras
 import random
 import tensorflow as tf
-from src.utils import log_specgram, pad_audio, chop_audio, label_transform, list_wavs_fname
+from src.utils import log_specgram, pad_audio, chop_audio, label_transform, list_wavs_fname, plot_confusion_matrix
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Dense, SimpleRNN, LSTM, Bidirectional, TimeDistributed, Conv1D, ZeroPadding1D, GRU
 from tensorflow.keras.layers import Lambda, Input, Dropout, Masking, BatchNormalization, Activation
@@ -36,7 +37,7 @@ def reset_random_seeds(seed):
     random.seed(seed)
 
 
-sample_rate = 16000
+
 all_labels = ['_background_noise_', 'dog', 'four', 'left', 'off', 'seven', 'three', 'wow', 'bed', 'down', 'go',
               'marvin', 'on', 'sheila', 'tree', 'yes', 'bird', 'eight', 'happy', 'nine', 'one', 'six', 'two', 'zero',
               'cat', 'five', 'house', 'no', 'right', 'stop', 'up']
@@ -50,16 +51,29 @@ train_data_path = os.path.join('data', 'train', 'audio')
 # test_data_path = os.path.join(root_path, 'data', 'test', 'audio')
 
 labels, fnames = list_wavs_fname(train_data_path)
+all_files = set([os.path.join(label, fname) for label, fname in zip(labels, fnames)])
 
+with open("data/train/validation_list.txt", "r") as f:
+    validation_files = f.read().splitlines()
+validation_files = set([os.path.normpath(v) for v in validation_files])
+train_files = list(all_files.difference(validation_files))
+validation_files = list(validation_files)
+train_files = train_files + [v for v in validation_files if v.startswith("_background")]
 new_sample_rate = 16000
 y_train = []
 x_train = []
-
-for label, fname in zip(labels, fnames):
-    sample_rate, samples = wavfile.read(os.path.join(train_data_path, label, fname))
+y_val = []
+x_val = []
+reset_random_seeds(420)
+for i, train_file in enumerate(train_files):
+    if not i%1000: print(i)
+    label, _ = train_file.split("\\")
+    sample_rate, samples = wavfile.read(os.path.join(train_data_path, train_file))
     samples = pad_audio(samples)
-    if len(samples) > 16000:
-        n_samples = chop_audio(samples)
+    if len(samples) > 16000 and label == '_background_noise_':
+        n_samples = chop_audio(samples, sample_rate=sample_rate, num=400)
+    elif len(samples) > 16000 and not label == '_background_noise_':
+        n_samples = chop_audio(samples, sample_rate=sample_rate, num=1)
     else:
         n_samples = [samples]
     for samples in n_samples:
@@ -68,13 +82,43 @@ for label, fname in zip(labels, fnames):
         y_train.append(label)
         x_train.append(specgram)
 
+for validation_file in validation_files:
+    label, _ = validation_file.split("\\")
+    sample_rate, samples = wavfile.read(os.path.join(train_data_path, validation_file))
+    samples = pad_audio(samples)
+    if len(samples) > 16000:
+        n_samples = chop_audio(samples, sample_rate=sample_rate, num=50)
+    else:
+        n_samples = [samples]
+    for samples in n_samples:
+        resampled = signal.resample(samples, int(new_sample_rate / sample_rate * samples.shape[0]))
+        _, _, specgram = log_specgram(resampled, sample_rate=new_sample_rate)
+        y_val.append(label)
+        x_val.append(specgram)
+
+
 x_train = np.array(x_train)
 y_train = label_transform(y_train, classes)
 label_index = y_train.columns.values
 y_train = y_train.values
 y_train = np.array(y_train)
+
+x_val = np.array(x_val)
+y_val = label_transform(y_val, classes)
+y_val = y_val.values
+y_val = np.array(y_val)
+
 del labels, fnames
 gc.collect()
+
+with open("data/x_train.pickle", "wb") as f:
+    pickle.dump(x_train, f)
+with open("data/y_train.pickle", "wb") as f:
+    pickle.dump(y_train, f)
+with open("data/x_val.pickle", "wb") as f:
+    pickle.dump(x_val, f)
+with open("data/y_val.pickle", "wb") as f:
+    pickle.dump(y_val, f)
 
 
 def cnn_lstm(input_dim, output_dim, dropout=0.2, n_layers=1):
@@ -120,8 +164,12 @@ model.compile(loss='categorical_crossentropy',
               optimizer=adam,
               metrics=['accuracy'])
 history = model.fit(x_train, y_train,
-                    batch_size=128, epochs=10,
-                    #validation_data=(X_val, Y_val)
+                    batch_size=128, epochs=50,
+                    validation_data=(x_val, y_val)
                     )
 
 pd.DataFrame(history.history).plot()
+
+pred = model.predict(x_val)
+
+plot_confusion_matrix(y_val.argmax(axis=1),pred.argmax(axis=1), normalize=True, classes=classes, filename="model1_conf_mat")
