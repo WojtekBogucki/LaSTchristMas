@@ -169,7 +169,7 @@ history = model.fit(x_train, y_train,
                     )
 
 pd.DataFrame(history.history).plot()
-
+model.evaluate(x_val, y_val)
 pred = model.predict(x_val)
 
 plot_confusion_matrix(y_val.argmax(axis=1),pred.argmax(axis=1), normalize=True, classes=classes, filename="model1_conf_mat")
