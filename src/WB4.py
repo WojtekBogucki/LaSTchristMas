@@ -1,3 +1,6 @@
+'''
+Bidirectional LSTM
+'''
 import pickle
 import os
 import numpy as np
@@ -34,7 +37,7 @@ with open("data/y_val.pickle", "rb") as f:
 
 classes = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', 'unknown', 'silence']
 
-def cnn_lstm2(input_dim, output_dim, dropout=0.2):
+def cnn_bilstm(input_dim, output_dim, dropout=0.2):
     # Input data type
     reset_random_seeds(420)
     dtype = 'float32'
@@ -47,8 +50,8 @@ def cnn_lstm2(input_dim, output_dim, dropout=0.2):
         Activation('relu'),
         BatchNormalization(),
         Dropout(dropout),
-        LSTM(512, activation='tanh', return_sequences=True, recurrent_activation='sigmoid', dropout=dropout),
-        LSTM(512, activation='tanh', return_sequences=False, recurrent_activation='sigmoid', dropout=dropout),
+        Bidirectional(LSTM(512, activation='tanh', return_sequences=True, recurrent_activation='sigmoid', dropout=dropout)),
+        Bidirectional(LSTM(512, activation='tanh', return_sequences=False, recurrent_activation='sigmoid', dropout=dropout)),
         Dense(units=128, activation='relu'),
         Dropout(dropout),
         Dense(units=output_dim, activation='softmax')
@@ -59,21 +62,21 @@ def cnn_lstm2(input_dim, output_dim, dropout=0.2):
 input_dim = (99, 161)
 n_classes = len(classes)
 K.clear_session()
-model2 = cnn_lstm2(input_dim, n_classes)
-model2.summary()
+model4 = cnn_bilstm(input_dim, n_classes)
+model4.summary()
 
 adam = Adam(lr=1e-4, clipnorm=1.0)
 
-model2.compile(loss='categorical_crossentropy',
+model4.compile(loss='categorical_crossentropy',
               optimizer=adam,
               metrics=['accuracy'])
-history2 = model2.fit(x_train, y_train,
+history4 = model4.fit(x_train, y_train,
                     batch_size=128, epochs=20,
                     validation_data=(x_val, y_val)
                     )
 
-pd.DataFrame(history2.history).plot()
-model2.evaluate(x_val, y_val)
-pred2 = model2.predict(x_val)
+pd.DataFrame(history4.history).plot()
+model4.evaluate(x_val, y_val)
+pred4 = model4.predict(x_val)
 
-plot_confusion_matrix(y_val.argmax(axis=1),pred2.argmax(axis=1), normalize=True, classes=classes, filename="model2_conf_mat")
+plot_confusion_matrix(y_val.argmax(axis=1),pred4.argmax(axis=1), normalize=True, classes=classes, filename="model4_conf_mat")
