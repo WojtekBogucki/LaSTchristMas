@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import random
 import tensorflow as tf
-from src.utils import log_specgram, pad_audio, chop_audio, label_transform, list_wavs_fname, plot_confusion_matrix, visualize
+from src.utils import log_specgram, pad_audio, chop_audio, label_transform, list_wavs_fname, plot_confusion_matrix, visualize2
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Dense, SimpleRNN, LSTM, Bidirectional, TimeDistributed, Conv1D, ZeroPadding1D, GRU
 from tensorflow.keras.layers import Lambda, Input, Dropout, Masking, BatchNormalization, Activation
@@ -86,16 +86,16 @@ with open("data/hist2.pickle", "rb") as f:
 histories3 = [hist.history for hist in histories3]
 histories3 = histories3 + histories2[6:]
 with open("data/conv_layers_test_hist.pickle", "wb") as f:
-    pickle.dump([hist.history for hist in histories3], f)
+    pickle.dump(histories3, f)
 
 with open("data/conv_layers_test_pred.pickle", "wb") as f:
     pickle.dump(predictions3, f)
 
 labels = list(np.array([[name + " " +str(i) for i in range(1, 4)] for name in ["2 conv layers", "1 conv layers"]]).flatten())
-visualize(histories3, labels, "loss", title="Comparison of loss on training set")
-visualize(histories3, labels, "accuracy", title="Comparison of accuracy on training set")
-visualize(histories3, labels, "val_loss", title="Comparison of loss on validation set")
-visualize(histories3, labels, "val_accuracy", title="Comparison of accuracy on validation set")
+visualize2(histories3, labels, "loss", title="Comparison of loss on training set")
+visualize2(histories3, labels, "accuracy", title="Comparison of accuracy on training set")
+visualize2(histories3, labels, "val_loss", title="Comparison of loss on validation set")
+visualize2(histories3, labels, "val_accuracy", title="Comparison of accuracy on validation set")
 
 losses3=[]
 accs3=[]
@@ -104,9 +104,9 @@ for model in models3:
     losses3.append(loss)
     accs3.append(acc)
 
-stats2 = pd.read_csv("stats/model1_stats.csv")
+stats2 = pd.read_csv("stats/model1_stats2.csv")
 stats3 = pd.DataFrame({"model": ["2 conv layers", "1 conv layers"],
-                      "avg_loss": [np.mean(losses3[:3]), stats2[2, "avg_loss"]],
-                      "avg_acc": [np.mean(accs3[:3]),stats2[2, "avg_acc"]]})
+                      "avg_loss": [np.mean(losses3[:3]), stats2.loc[2, "avg_loss"]],
+                      "avg_acc": [np.mean(accs3[:3]),stats2.loc[2, "avg_acc"]]})
 
 stats3.to_csv("stats/model1_stats3.csv")
