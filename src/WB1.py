@@ -18,7 +18,7 @@ from sklearn.model_selection import train_test_split
 import keras
 import random
 import tensorflow as tf
-from src.utils import log_specgram, pad_audio, chop_audio, label_transform, list_wavs_fname, plot_confusion_matrix
+from src.utils import log_specgram, pad_audio, chop_audio, label_transform, list_wavs_fname, plot_confusion_matrix, visualize
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Dense, SimpleRNN, LSTM, Bidirectional, TimeDistributed, Conv1D, ZeroPadding1D, GRU
 from tensorflow.keras.layers import Lambda, Input, Dropout, Masking, BatchNormalization, Activation
@@ -121,16 +121,26 @@ with open("data/y_val.pickle", "wb") as f:
     pickle.dump(y_val, f)
 
 
-def cnn_lstm(input_dim, output_dim, dropout=0.2, n_layers=1):
-    #     # Input data type
-    reset_random_seeds(420)
+with open("data/x_train.pickle", "rb") as f:
+    x_train = pickle.load(f)
+with open("data/y_train.pickle", "rb") as f:
+    y_train = pickle.load(f)
+with open("data/x_val.pickle", "rb") as f:
+    x_val = pickle.load(f)
+with open("data/y_val.pickle", "rb") as f:
+    y_val = pickle.load(f)
+
+
+def cnn_lstm(input_dim, output_dim, dropout=0.2, seed=420, kernel_size=10):
+    # Input data type
+    reset_random_seeds(seed)
     dtype = 'float32'
 
     # ---- Network model ----
     input_data = Input(name='the_input', shape=input_dim, dtype=dtype)
 
     # 1 x 1D convolutional layers with strides 4
-    x = Conv1D(filters=256, kernel_size=10, strides=4, name='conv_1')(input_data)
+    x = Conv1D(filters=256, kernel_size=kernel_size, strides=4, name='conv_1')(input_data)
     x = BatchNormalization()(x)
     x = Activation('relu')(x)
     x = Dropout(dropout, name='dropout_1')(x)
@@ -140,7 +150,7 @@ def cnn_lstm(input_dim, output_dim, dropout=0.2, n_layers=1):
     x = LSTM(128, activation='tanh', return_sequences=False, recurrent_activation='sigmoid',
              dropout=dropout, name='lstm_2')(x)
 
-    #     # 1 fully connected layer DNN ReLu with default 20% dropout
+    # 1 fully connected layer DNN ReLu with default 20% dropout
     x = Dense(units=64, activation='relu', name='fc')(x)
     x = Dropout(dropout, name='dropout_2')(x)
 
@@ -153,23 +163,46 @@ def cnn_lstm(input_dim, output_dim, dropout=0.2, n_layers=1):
 
 
 input_dim = (99, 161)
-classes = len(classes)
-K.clear_session()
-model = cnn_lstm(input_dim, classes)
-model.summary()
-
+n_classes = len(classes)
 adam = Adam(lr=1e-4, clipnorm=1.0)
+models = []
+histories = []
+predictions = []
+for dropout in [0, 0.2, 0.4]:
+    for seed in [420, 1234, 4567]:
+        K.clear_session()
+        model = cnn_lstm(input_dim, n_classes, dropout, seed)
 
-model.compile(loss='categorical_crossentropy',
-              optimizer=adam,
-              metrics=['accuracy'])
-history = model.fit(x_train, y_train,
-                    batch_size=128, epochs=50,
-                    validation_data=(x_val, y_val)
-                    )
+        model.compile(loss='categorical_crossentropy',
+                      optimizer=adam,
+                      metrics=['accuracy'])
+        print("Model dropout: {0}, seed: {1}".format(dropout, seed))
+        history = model.fit(x_train, y_train,
+                            batch_size=128, epochs=50,
+                            validation_data=(x_val, y_val)
+                            )
 
-pd.DataFrame(history.history).plot()
-model.evaluate(x_val, y_val)
-pred = model.predict(x_val)
+        pred = model.predict(x_val)
+        # plot_confusion_matrix(y_val.argmax(axis=1),pred.argmax(axis=1), normalize=True, classes=classes, filename="model1_drop_{}".format(int(dropout*100)))
+        models.append(model)
+        histories.append(history)
+        predictions.append(pred)
 
-plot_confusion_matrix(y_val.argmax(axis=1),pred.argmax(axis=1), normalize=True, classes=classes, filename="model1_conf_mat")
+labels = list(np.array([[name + " " +str(i) for i in range(1, 4)] for name in ["dropout=0", "dropout=0.2", "dropout=0.4"]]).flatten())
+visualize(histories, labels, "loss", title="Comparison of loss on training set", filename="model1_drop")
+visualize(histories, labels, "accuracy", title="Comparison of accuracy on training set", filename="model1_drop")
+visualize(histories, labels, "val_loss", title="Comparison of loss on validation set", filename="model1_drop")
+visualize(histories, labels, "val_accuracy", title="Comparison of accuracy on validation set", filename="model1_drop")
+
+losses=[]
+accs=[]
+for model in models:
+    loss, acc = model.evaluate(x_val, y_val)
+    losses.append(loss)
+    accs.append(acc)
+
+stats = pd.DataFrame({"model": ["dropout=0", "dropout=0.2", "dropout=0.4"],
+                      "avg_loss": [np.mean(losses[:3]),np.mean(losses[3:6]),np.mean(losses[6:9])],
+                      "avg_acc": [np.mean(accs[:3]),np.mean(accs[3:6]),np.mean(accs[6:9])]})
+
+stats.to_csv("stats/model1_stats.csv")
