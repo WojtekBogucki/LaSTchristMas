@@ -188,6 +188,9 @@ for dropout in [0, 0.2, 0.4]:
         histories.append(history)
         predictions.append(pred)
 
+
+with open("hist1.pickle", "wb") as f:
+    pickle.dump([hist.history for hist in histories], f)
 labels = list(np.array([[name + " " +str(i) for i in range(1, 4)] for name in ["dropout=0", "dropout=0.2", "dropout=0.4"]]).flatten())
 visualize(histories, labels, "loss", title="Comparison of loss on training set", filename="model1_drop")
 visualize(histories, labels, "accuracy", title="Comparison of accuracy on training set", filename="model1_drop")
@@ -206,3 +209,48 @@ stats = pd.DataFrame({"model": ["dropout=0", "dropout=0.2", "dropout=0.4"],
                       "avg_acc": [np.mean(accs[:3]),np.mean(accs[3:6]),np.mean(accs[6:9])]})
 
 stats.to_csv("stats/model1_stats.csv")
+#########
+models2 = []
+histories2 = []
+predictions2 = []
+for kernel_size in [5, 15]:
+    for seed in [420, 1234, 4567]:
+        K.clear_session()
+        model = cnn_lstm(input_dim, n_classes, 0.4, seed, kernel_size)
+
+        model.compile(loss='categorical_crossentropy',
+                      optimizer=adam,
+                      metrics=['accuracy'])
+        print("Model kernel size: {0}, seed: {1}".format(kernel_size, seed))
+        history = model.fit(x_train, y_train,
+                            batch_size=128, epochs=50,
+                            validation_data=(x_val, y_val)
+                            )
+
+        pred = model.predict(x_val)
+        # plot_confusion_matrix(y_val.argmax(axis=1),pred.argmax(axis=1), normalize=True, classes=classes, filename="model1_drop_{}".format(int(dropout*100)))
+        models2.append(model)
+        histories2.append(history)
+        predictions2.append(pred)
+
+histories2 = histories2 + histories[6:]
+with open("hist2.pickle", "wb") as f:
+    pickle.dump([hist.history for hist in histories2], f)
+labels2 = list(np.array([[name + " " +str(i) for i in range(1, 4)] for name in ["kernel_size=5", "kernel_size=15", "kernel_size=10"]]).flatten())
+visualize(histories2, labels2, "loss", title="Comparison of loss on training set", filename="model1_ker_size")
+visualize(histories2, labels2, "accuracy", title="Comparison of accuracy on training set", filename="model1_ker_size")
+visualize(histories2, labels2, "val_loss", title="Comparison of loss on validation set", filename="model1_ker_size")
+visualize(histories2, labels2, "val_accuracy", title="Comparison of accuracy on validation set", filename="model1_ker_size")
+
+losses2=[]
+accs2=[]
+for model in models2:
+    loss, acc = model.evaluate(x_val, y_val)
+    losses2.append(loss)
+    accs2.append(acc)
+
+stats2 = pd.DataFrame({"model": ["kernel_size=5", "kernel_size=15", "kernel_size=10"],
+                      "avg_loss": [np.mean(losses2[:3]),np.mean(losses2[3:6]),np.mean(losses[6:9])],
+                      "avg_acc": [np.mean(accs2[:3]),np.mean(accs2[3:6]),np.mean(accs[6:9])]})
+
+stats2.to_csv("stats/model1_stats2.csv")
