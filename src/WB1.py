@@ -191,6 +191,10 @@ for dropout in [0, 0.2, 0.4]:
 
 with open("hist1.pickle", "wb") as f:
     pickle.dump([hist.history for hist in histories], f)
+
+with open("data/dropout_test_pred.pickle", "wb") as f:
+    pickle.dump(predictions, f)
+
 labels = list(np.array([[name + " " +str(i) for i in range(1, 4)] for name in ["dropout=0", "dropout=0.2", "dropout=0.4"]]).flatten())
 visualize(histories, labels, "loss", title="Comparison of loss on training set", filename="model1_drop")
 visualize(histories, labels, "accuracy", title="Comparison of accuracy on training set", filename="model1_drop")
@@ -236,6 +240,10 @@ for kernel_size in [5, 15]:
 histories2 = histories2 + histories[6:]
 with open("hist2.pickle", "wb") as f:
     pickle.dump([hist.history for hist in histories2], f)
+
+with open("data/kernel_size_test_pred.pickle", "wb") as f:
+    pickle.dump(predictions2, f)
+
 labels2 = list(np.array([[name + " " +str(i) for i in range(1, 4)] for name in ["kernel_size=5", "kernel_size=15", "kernel_size=10"]]).flatten())
 visualize(histories2, labels2, "loss", title="Comparison of loss on training set", filename="model1_ker_size")
 visualize(histories2, labels2, "accuracy", title="Comparison of accuracy on training set", filename="model1_ker_size")

@@ -80,24 +80,33 @@ for seed in [420, 1234, 4567]:
     predictions3.append(pred)
 
 
-with open("hist2.pickle", "rb") as f:
-    pickle.load(f)
+with open("data/hist2.pickle", "rb") as f:
+    histories2 = pickle.load(f)
 
-labels = list(np.array([[name + " " +str(i) for i in range(1, 4)] for name in ["dropout=0", "dropout=0.2", "dropout=0.4"]]).flatten())
-visualize(histories, labels, "loss", title="Comparison of loss on training set", filename="model1_drop")
-visualize(histories, labels, "accuracy", title="Comparison of accuracy on training set", filename="model1_drop")
-visualize(histories, labels, "val_loss", title="Comparison of loss on validation set", filename="model1_drop")
-visualize(histories, labels, "val_accuracy", title="Comparison of accuracy on validation set", filename="model1_drop")
+histories3 = [hist.history for hist in histories3]
+histories3 = histories3 + histories2[6:]
+with open("data/conv_layers_test_hist.pickle", "wb") as f:
+    pickle.dump([hist.history for hist in histories3], f)
 
-losses=[]
-accs=[]
-for model in models:
+with open("data/conv_layers_test_pred.pickle", "wb") as f:
+    pickle.dump(predictions3, f)
+
+labels = list(np.array([[name + " " +str(i) for i in range(1, 4)] for name in ["2 conv layers", "1 conv layers"]]).flatten())
+visualize(histories3, labels, "loss", title="Comparison of loss on training set")
+visualize(histories3, labels, "accuracy", title="Comparison of accuracy on training set")
+visualize(histories3, labels, "val_loss", title="Comparison of loss on validation set")
+visualize(histories3, labels, "val_accuracy", title="Comparison of accuracy on validation set")
+
+losses3=[]
+accs3=[]
+for model in models3:
     loss, acc = model.evaluate(x_val, y_val)
-    losses.append(loss)
-    accs.append(acc)
+    losses3.append(loss)
+    accs3.append(acc)
 
-stats = pd.DataFrame({"model": ["dropout=0", "dropout=0.2", "dropout=0.4"],
-                      "avg_loss": [np.mean(losses[:3]),np.mean(losses[3:6]),np.mean(losses[6:9])],
-                      "avg_acc": [np.mean(accs[:3]),np.mean(accs[3:6]),np.mean(accs[6:9])]})
+stats2 = pd.read_csv("stats/model1_stats.csv")
+stats3 = pd.DataFrame({"model": ["2 conv layers", "1 conv layers"],
+                      "avg_loss": [np.mean(losses3[:3]), stats2[2, "avg_loss"]],
+                      "avg_acc": [np.mean(accs3[:3]),stats2[2, "avg_acc"]]})
 
-stats.to_csv("stats/model1_stats.csv")
+stats3.to_csv("stats/model1_stats3.csv")
