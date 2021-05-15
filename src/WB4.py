@@ -43,13 +43,13 @@ def cnn_bilstm(input_dim, output_dim, dropout=0.4, seed=420):
     reset_random_seeds(seed)
     dtype = 'float32'
     model = Sequential([
-        Conv1D(filters=256, kernel_size=15, strides=4, input_shape=input_dim, dtype=dtype),
+        Conv1D(filters=256, kernel_size=10, strides=4, input_shape=input_dim, dtype=dtype),
         Activation('relu'),
         BatchNormalization(),
         Dropout(dropout),
-        Bidirectional(LSTM(512, activation='tanh', return_sequences=True, recurrent_activation='sigmoid', dropout=dropout)),
-        Bidirectional(LSTM(512, activation='tanh', return_sequences=False, recurrent_activation='sigmoid', dropout=dropout)),
-        Dense(units=128, activation='relu'),
+        Bidirectional(LSTM(128, activation='tanh', return_sequences=True, recurrent_activation='sigmoid', dropout=dropout)),
+        Bidirectional(LSTM(128, activation='tanh', return_sequences=False, recurrent_activation='sigmoid', dropout=dropout)),
+        Dense(units=64, activation='relu'),
         Dropout(dropout),
         Dense(units=output_dim, activation='softmax')
     ])
@@ -82,18 +82,18 @@ for seed in [420, 1234, 4567]:
     predictions5.append(pred)
 
 
-with open("data/conv_layers_test_hist.pickle", "rb") as f:
+with open("data/gru_test_hist.pickle", "rb") as f:
     histories3 = pickle.load(f)
 
 histories5 = [hist.history for hist in histories5]
-histories5 = histories5 + histories3[3:]
+histories5 = histories5 + histories3
 with open("data/bilstm_test_hist.pickle", "wb") as f:
     pickle.dump(histories5, f)
 
 with open("data/bilstm_test_pred.pickle", "wb") as f:
     pickle.dump(predictions5, f)
 
-labels = list(np.array([[name + " " +str(i) for i in range(1, 4)] for name in ["BILSTM", "LSTM"]]).flatten())
+labels = list(np.array([[name + " " +str(i) for i in range(1, 4)] for name in ["BILSTM", "GRU", "LSTM"]]).flatten())
 visualize2(histories5, labels, "loss", title="Comparison of loss on training set")
 visualize2(histories5, labels, "accuracy", title="Comparison of accuracy on training set")
 visualize2(histories5, labels, "val_loss", title="Comparison of loss on validation set", start_from=30)
@@ -106,9 +106,9 @@ for model in models5:
     losses5.append(loss)
     accs5.append(acc)
 
-stats3 = pd.read_csv("stats/model1_stats3.csv")
-stats5 = pd.DataFrame({"model": ["BILSTM", "LSTM"],
-                       "avg_loss": [np.mean(losses5[:3]), stats3.loc[1, "avg_loss"]],
-                       "avg_acc": [np.mean(accs5[:3]),stats3.loc[1, "avg_acc"]]})
+stats4 = pd.read_csv("stats/model1_stats4.csv")
+stats5 = pd.DataFrame({"model": ["BILSTM", "GRU", "LSTM"],
+                       "avg_loss": [np.mean(losses5[:3]), stats4.loc[0, "avg_loss"], stats4.loc[1, "avg_loss"]],
+                       "avg_acc": [np.mean(accs5[:3]),stats4.loc[0, "avg_acc"],stats4.loc[1, "avg_acc"]]})
 
 stats5.to_csv("stats/model1_stats5.csv")
