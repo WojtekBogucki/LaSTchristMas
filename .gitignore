@@ -1,3 +1,14 @@
 data/train
 venv/
 .idea/
+.Rproj.user
+
+data/x_train.pickle
+
+data/x_val.pickle
+
+data/y_train.pickle
+
+data/y_val.pickle
+
+src/__pycache__/
