@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 import random
 import tensorflow as tf
-from src.utils import log_specgram, pad_audio, chop_audio, label_transform, list_wavs_fname, plot_confusion_matrix
+from src.utils import log_specgram, pad_audio, chop_audio, label_transform, list_wavs_fname, plot_confusion_matrix, \
+    visualize2
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Dense, SimpleRNN, LSTM, Bidirectional, TimeDistributed, Conv1D, ZeroPadding1D, GRU
 from tensorflow.keras.layers import Lambda, Input, Dropout, Masking, BatchNormalization, Activation
@@ -37,16 +38,12 @@ with open("data/y_val.pickle", "rb") as f:
 
 classes = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', 'unknown', 'silence']
 
-def cnn_bilstm(input_dim, output_dim, dropout=0.2):
+def cnn_bilstm(input_dim, output_dim, dropout=0.4, seed=420):
     # Input data type
-    reset_random_seeds(420)
+    reset_random_seeds(seed)
     dtype = 'float32'
     model = Sequential([
-        Conv1D(filters=512, kernel_size=15, strides=4, input_shape=input_dim, dtype=dtype),
-        Activation('relu'),
-        BatchNormalization(),
-        Dropout(dropout),
-        Conv1D(filters=256, kernel_size=15, strides=4),
+        Conv1D(filters=256, kernel_size=15, strides=4, input_shape=input_dim, dtype=dtype),
         Activation('relu'),
         BatchNormalization(),
         Dropout(dropout),
@@ -61,22 +58,57 @@ def cnn_bilstm(input_dim, output_dim, dropout=0.2):
 
 input_dim = (99, 161)
 n_classes = len(classes)
-K.clear_session()
-model4 = cnn_bilstm(input_dim, n_classes)
-model4.summary()
-
 adam = Adam(lr=1e-4, clipnorm=1.0)
 
-model4.compile(loss='categorical_crossentropy',
-              optimizer=adam,
-              metrics=['accuracy'])
-history4 = model4.fit(x_train, y_train,
-                    batch_size=128, epochs=20,
-                    validation_data=(x_val, y_val)
-                    )
+models5 = []
+histories5 = []
+predictions5 = []
 
-pd.DataFrame(history4.history).plot()
-model4.evaluate(x_val, y_val)
-pred4 = model4.predict(x_val)
+for seed in [420, 1234, 4567]:
+    K.clear_session()
+    model = cnn_bilstm(input_dim, n_classes, 0.4, seed)
+    model.compile(loss='categorical_crossentropy',
+                  optimizer=adam,
+                  metrics=['accuracy'])
+    print("Model  seed: {0}".format(seed))
+    history = model.fit(x_train, y_train,
+                        batch_size=128, epochs=50,
+                        validation_data=(x_val, y_val)
+                        )
+    pred = model.predict(x_val)
+    # plot_confusion_matrix(y_val.argmax(axis=1),pred.argmax(axis=1), normalize=True, classes=classes, filename="model1_drop_{}".format(int(dropout*100)))
+    models5.append(model)
+    histories5.append(history)
+    predictions5.append(pred)
 
-plot_confusion_matrix(y_val.argmax(axis=1),pred4.argmax(axis=1), normalize=True, classes=classes, filename="model4_conf_mat")
+
+with open("data/conv_layers_test_hist.pickle", "rb") as f:
+    histories3 = pickle.load(f)
+
+histories5 = [hist.history for hist in histories5]
+histories5 = histories5 + histories3[3:]
+with open("data/bilstm_test_hist.pickle", "wb") as f:
+    pickle.dump(histories5, f)
+
+with open("data/bilstm_test_pred.pickle", "wb") as f:
+    pickle.dump(predictions5, f)
+
+labels = list(np.array([[name + " " +str(i) for i in range(1, 4)] for name in ["BILSTM", "LSTM"]]).flatten())
+visualize2(histories5, labels, "loss", title="Comparison of loss on training set")
+visualize2(histories5, labels, "accuracy", title="Comparison of accuracy on training set")
+visualize2(histories5, labels, "val_loss", title="Comparison of loss on validation set", start_from=30)
+visualize2(histories5, labels, "val_accuracy", title="Comparison of accuracy on validation set", start_from=30)
+
+losses5=[]
+accs5=[]
+for model in models5:
+    loss, acc = model.evaluate(x_val, y_val)
+    losses5.append(loss)
+    accs5.append(acc)
+
+stats3 = pd.read_csv("stats/model1_stats3.csv")
+stats5 = pd.DataFrame({"model": ["BILSTM", "LSTM"],
+                       "avg_loss": [np.mean(losses5[:3]), stats3.loc[1, "avg_loss"]],
+                       "avg_acc": [np.mean(accs5[:3]),stats3.loc[1, "avg_acc"]]})
+
+stats5.to_csv("stats/model1_stats5.csv")
