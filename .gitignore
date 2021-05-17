@@ -1,4 +1,5 @@
 data/train
+data/test
 venv/
 .idea/
 .Rproj.user
