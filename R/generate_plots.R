@@ -7,18 +7,29 @@ library(patchwork)
 
 pd <- import("pandas")
 
-history_names <- c("hist1.pickle", "hist2.pickle", "conv_layers_test_hist.pickle", "gru_test_hist.pickle", "bilstm_test_hist.pickle")
+history_names <- c("hist1.pickle", 
+                   "hist2.pickle", 
+                   "conv_layers_test_hist.pickle", 
+                   "bilstm_test_hist.pickle", 
+                   "bilstm_size_test_hist.pickle",
+                   "bilstm_n_layers_test_hist.pickle")
 history_pickles <- map(paste0("data/", history_names), function(hist) pd$read_pickle(hist))
-tested_parameters <- c("dropout rate", "kernel size", "number of conv layers", "type of layer", "type of layer")
+tested_parameters <- c("dropout rate", 
+                       "kernel size", 
+                       "number of conv layers", 
+                       "type of layer",
+                       "size of layers",
+                       "number of layers")
 tested_parameter_values <- list(
   c(0, 0.2, 0.4),
   c(5, 15, 10),
   c(2, 1),
-  c("GRU", "LSTM"),
-  c("BILSTM", "LSTM")
+  c("BILSTM", "GRU", "LSTM"),
+  c(64, 256, 128),
+  c(1, 3, 2)
 )
 
-histories <- map(1:5, function(i) {
+histories <- map(1:6, function(i) {
   map2_dfr(history_pickles[[i]], rep(tested_parameter_values[[i]], each = 3), 
            function(df, tested_parameter_value) {
     df %>%
@@ -29,15 +40,6 @@ histories <- map(1:5, function(i) {
              tested_parameter_value = factor(tested_parameter_value))
   })
 })
-
-histories[[4]] <- histories[[4]] %>%
-  bind_rows(histories[[5]] %>%
-              filter(tested_parameter_value != "LSTM"))
-histories[[5]] <- NULL
-
-tested_parameters <- tested_parameters[1:4]
-tested_parameter_values[[5]] <- NULL
-tested_parameter_values[[4]] <- c("GRU", "LSTM", "BILSTM")
 
 plots <- map2(histories, tested_parameters, function(history, parameter) {
   subplots <- map2(c("loss", "accuracy", "val_loss", "val_accuracy"),
